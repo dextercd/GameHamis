@@ -1,0 +1,50 @@
+<Entity name="cartridge">
+
+    <ItemComponent
+        _tags="enabled_in_world"
+        item_name="GameHämis Cartridge"
+        max_child_items="0"
+        is_pickable="1"
+        is_equipable_forced="1"
+        play_spinning_animation="0"
+        ui_sprite="mods/GameHamis/item_gfx/cartridge.png"
+        ui_description="Cartridge for the GameHämis handheld console"
+        preferred_inventory="FULL"
+        />
+
+    <HitboxComponent
+        _tags="enabled_in_world"
+        aabb_min_x="-4"
+        aabb_max_x="4"
+        aabb_min_y="-3"
+        aabb_max_y="3"
+        />
+
+    <SimplePhysicsComponent
+        _tags="enabled_in_world"
+        />
+
+    <VelocityComponent
+        _tags="enabled_in_world"
+        />
+
+    <SpriteComponent
+        _tags="enabled_in_world"
+        image_file="mods/GameHamis/item_gfx/cartridge.png"
+        offset_x="3"
+        offset_y="6"
+        z_index="-1.51"
+        />
+
+    <LuaComponent
+        script_source_file="mods/GameHamis/items/cartridge.lua"
+        call_init_function="1"
+        execute_on_added="1"
+        remove_after_executed="1"
+        />
+
+    <ItemActionComponent action_id="GAMEHAMIS_CARTRIDGE" />
+
+    <VariableStorageComponent name="cartridge_path" />
+
+</Entity>

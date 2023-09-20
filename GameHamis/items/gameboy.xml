@@ -1,0 +1,91 @@
+<Entity>
+
+    <PhysicsBodyComponent
+        _tags="enabled_in_world"
+        uid="1"
+        allow_sleep="1"
+        angular_damping="0"
+        fixed_rotation="0"
+        is_bullet="1"
+        linear_damping="0"
+        auto_clean="1"
+        hax_fix_going_through_ground="1"
+        on_death_leave_physics_body="0"
+        on_death_really_leave_body="0"
+    ></PhysicsBodyComponent>
+
+    <PhysicsImageShapeComponent
+        body_id="1"
+        centered="1"
+        image_file="mods/GameHamis/item_gfx/gameboy.png"
+        material="rock_box2d_hard"
+    ></PhysicsImageShapeComponent>
+
+    <PhysicsThrowableComponent
+        max_throw_speed="130"
+        throw_force_coeff="1.5"
+    ></PhysicsThrowableComponent>
+
+    <ProjectileComponent
+        _tags="enabled_in_world"
+        lifetime="-1"
+        penetrate_entities="1"
+        never_hit_player="1"
+    ></ProjectileComponent>
+
+    <VelocityComponent
+        _tags="enabled_in_world"
+    ></VelocityComponent>
+
+    <ItemComponent
+        _tags="enabled_in_world"
+        max_child_items="1"
+        is_pickable="1"
+        is_equipable_forced="1"
+        ui_sprite="mods/GameHamis/item_gfx/gameboy.png"
+        preferred_inventory="QUICK"
+        item_name="GameHämis"
+        ui_description="GameHämis Handheld Console"
+        />
+
+    <SpriteComponent
+        _tags="enabled_in_hand"
+        _enabled="0"
+        offset_x="2"
+        offset_y="9.5"
+        image_file="mods/GameHamis/item_gfx/gameboy.png"
+    ></SpriteComponent>
+
+    <HitboxComponent
+        _tags="enabled_in_world"
+        aabb_min_x="-3"
+        aabb_max_x="3"
+        aabb_min_y="-5"
+        aabb_max_y="0" >
+    </HitboxComponent>
+
+    <AbilityComponent
+        ui_name="GameHämis"
+        throw_as_item="1"
+        use_gun_script="1"
+        ><gun_config
+            deck_capacity="1"
+        ></gun_config>
+    </AbilityComponent>
+
+    <LuaComponent
+        _tags="enabled_in_hand,enabled_in_inventory,enabled_in_world"
+        script_source_file="mods/GameHamis/items/gameboy.lua"
+        execute_every_n_frame="-1"
+        execute_on_added="1"
+        enable_coroutines="1"
+        />
+
+    <LuaComponent
+        _tags="enabled_in_hand"
+        execute_every_n_frame="-1"
+        script_enabled_changed="mods/GameHamis/scripts/block_inputs.lua"
+        script_death="mods/GameHamis/scripts/block_inputs.lua"
+        />
+
+</Entity>

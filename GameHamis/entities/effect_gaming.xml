@@ -1,0 +1,16 @@
+<Entity name="gh_gaming">
+    <GameEffectComponent
+        effect="CUSTOM"
+        custom_effect_id="GH_GAMING"
+        disable_movement="1"
+        frames="-1"
+        />
+
+    <LuaComponent
+        script_source_file="mods/GameHamis/entities/effect_gaming.lua"
+        execute_on_removed="1"
+        execute_every_n_frame="-1"
+        />
+
+    <ControlsComponent />
+</Entity>
