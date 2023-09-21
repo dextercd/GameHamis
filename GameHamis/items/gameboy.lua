@@ -1,3 +1,5 @@
+dofile_once("data/scripts/lib/utilities.lua")
+
 local base64 = dofile("mods/GameHamis/base64.lua")
 
 local cartridge_path = nil
@@ -49,11 +51,50 @@ local text_offset_y = -7
 local offset_x = 200
 local offset_y = 50
 
-local screen_offset_x = 28
-local screen_offset_y = 21
+local screen_offset_x = offset_x + 28
+local screen_offset_y = offset_y +  21
+
+local function draw_screen_rect(gui, x, y, w, h, r, g, b)
+    local id = 100000 + y * screen_pixels_width + x
+    GuiColorSetForNextWidget(gui, r/255, g/255, b/255, 1)
+    GuiImage(gui, id, screen_offset_x + x, screen_offset_y + y, "mods/GameHamis/1.png", 1, w, h)
+end
+
+local function draw_screen_span(gui, sx, sy, ex, ey, r, g, b)
+    if sx ~= 0 and sy < ey then
+        draw_screen_rect(gui, sx, sy, screen_pixels_width - sx, 1, r, g, b)
+        sx = 0
+        sy = sy + 1
+    end
+
+    local fulllines = ey - sy
+    if fulllines > 0 then
+        draw_screen_rect(gui, 0, sy, screen_pixels_width, fulllines, r, g, b)
+        sy = sy + fulllines
+    end
+
+    if ex > sx then
+        draw_screen_rect(gui, sx, ey, ex - sx, 1, r, g, b)
+    end
+end
 
 function draw()
     GuiZSet(gui, -10000)
+
+    GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
+
+    -- Horscht magic. Disable buttons taking focus when using controller
+    local player = EntityGetWithTag("player_unit")[1]
+    if player then
+        local platform_shooter_player = EntityGetFirstComponentIncludingDisabled(player, "PlatformShooterPlayerComponent")
+        if platform_shooter_player then
+            if ComponentGetValue2(platform_shooter_player, "mHasGamepadControlsPrev") then
+                GuiOptionsAdd(gui, GUI_OPTION.NonInteractive)
+                GuiOptionsAdd(gui, GUI_OPTION.AlwaysClickable)
+            end
+        end
+    end
+
     GuiImage(gui, 100, offset_x, offset_y, "mods/GameHamis/ui/device.png", 1, 1, 1)
 
     GuiZSet(gui, -10050)
@@ -74,13 +115,28 @@ function draw()
 
     GuiZSet(gui, -10100)
 
-    for y=0,screen_pixels_height-1 do
-        for x=0,screen_pixels_width-1 do
+    local sx, sy = 0, 0
+    local cr, cg, cb = getrgb(0, 0)
+    local y = 0
+    local x = 1
+
+    while y < screen_pixels_height do
+        while x < screen_pixels_width do
             local r,g,b = getrgb(x, y)
-            GuiColorSetForNextWidget(gui, r/255, g/255, b/255, 1)
-            GuiText(gui, x + offset_x + screen_offset_x, y + offset_y + text_offset_y + screen_offset_y, ".")
+            if r ~= cr or g ~= cg or b ~= cb then
+                draw_screen_span(gui, sx, sy, x, y, cr, cg, cb)
+
+                cr, cg, cb = r, g, b
+                sx, sy = x, y
+            end
+
+            x = x + 1
         end
+        y = y + 1
+        x = 0
     end
+
+    draw_screen_span(gui, sx, sy, x, y, cr, cg, cb)
 end
 
 function handle_inputs(controls)
@@ -119,6 +175,28 @@ function wake_up_waiting_threads()
         end
     end
 
+    local gh_gaming
+    local controls
+    for _, v in ipairs(EntityGetAllChildren(player) or {}) do
+        if EntityGetName(v) == "gh_gaming" then
+            gh_gaming = v
+            controls = EntityGetFirstComponent(v, "ControlsComponent")
+        end
+    end
+
+    draw()
+
+    if controls then
+        if GuiButton(gui, 109, offset_x + 220, offset_y, "Unfocus") then
+            local ge = EntityGetFirstComponent(gh_gaming, "GameEffectComponent")
+            ComponentSetValue2(ge, "frames", 0)
+        end
+    else
+        if GuiButton(gui, 110, offset_x + 220, offset_y, "Focus") then
+            LoadGameEffectEntityTo(player, "mods/GameHamis/entities/effect_gaming.xml")
+        end
+    end
+
     if cartridge_path ~= new_cartridge_path then
         cartridge_path = new_cartridge_path
         if cartridge_path then
@@ -135,32 +213,13 @@ function wake_up_waiting_threads()
         end
     end
 
-    draw()
+    if not has_cartridge() then return end
+
     core.exports.executeFrame()
     core.exports.clearAudioBuffer()
 
-    local gh_gaming
-    local controls
-    for _, v in ipairs(EntityGetAllChildren(player) or {}) do
-        if EntityGetName(v) == "gh_gaming" then
-            gh_gaming = v
-            controls = EntityGetFirstComponent(v, "ControlsComponent")
-        end
-    end
-
     if controls then
         handle_inputs(controls)
-    end
-
-    if controls then
-        if GuiButton(gui, 109, offset_x + 220, offset_y, "Unfocus") then
-            local ge = EntityGetFirstComponent(gh_gaming, "GameEffectComponent")
-            ComponentSetValue2(ge, "frames", 0)
-        end
-    else
-        if GuiButton(gui, 110, offset_x + 220, offset_y, "Focus") then
-            LoadGameEffectEntityTo(player, "mods/GameHamis/entities/effect_gaming.xml")
-        end
     end
 end
 
