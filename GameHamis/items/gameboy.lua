@@ -19,11 +19,11 @@ reset()
 
 local frame_location = core.globals[core.exports.FRAME_LOCATION]
 
-function pixel_addr(x, y)
+local function pixel_addr(x, y)
     return frame_location + ((y * 160) + x) * 3
 end
 
-function getrgb(x, y)
+local function getrgb(x, y)
     local location = pixel_addr(x, y)
     local r = core.memory:read8(location)
     local g = core.memory:read8(location + 1)
@@ -31,7 +31,7 @@ function getrgb(x, y)
     return r, g, b
 end
 
-gui = GuiCreate()
+local gui = GuiCreate()
 
 local gui_up = false
 local gui_down = false
@@ -47,35 +47,62 @@ local gui_start = false
 local screen_pixels_width = 160
 local screen_pixels_height = 144
 
-local text_offset_y = -7
 local offset_x = 200
 local offset_y = 50
 
 local screen_offset_x = offset_x + 28
 local screen_offset_y = offset_y +  21
 
-local function draw_screen_rect(gui, x, y, w, h, r, g, b)
+local function draw_screen_rect(x, y, w, h, r, g, b)
     local id = 100000 + y * screen_pixels_width + x
     GuiColorSetForNextWidget(gui, r/255, g/255, b/255, 1)
     GuiImage(gui, id, screen_offset_x + x, screen_offset_y + y, "mods/GameHamis/1.png", 1, w, h)
 end
 
-local function draw_screen_span(gui, sx, sy, ex, ey, r, g, b)
+local function draw_screen_span(sx, sy, ex, ey, r, g, b)
     if sx ~= 0 and sy < ey then
-        draw_screen_rect(gui, sx, sy, screen_pixels_width - sx, 1, r, g, b)
+        draw_screen_rect(sx, sy, screen_pixels_width - sx, 1, r, g, b)
         sx = 0
         sy = sy + 1
     end
 
     local fulllines = ey - sy
     if fulllines > 0 then
-        draw_screen_rect(gui, 0, sy, screen_pixels_width, fulllines, r, g, b)
+        draw_screen_rect(0, sy, screen_pixels_width, fulllines, r, g, b)
         sy = sy + fulllines
     end
 
     if ex > sx then
-        draw_screen_rect(gui, sx, ey, ex - sx, 1, r, g, b)
+        draw_screen_rect(sx, ey, ex - sx, 1, r, g, b)
     end
+end
+
+local function color_key(r, g, b)
+    return bit.bor(
+        bit.lshift(r, 16),
+        bit.lshift(g, 8),
+        b
+    )
+end
+
+local function key_to_color(key)
+    return bit.rshift(key, 16),  bit.band(bit.rshift(key, 8), 0xff), bit.band(key, 0xff)
+end
+
+local function span_draw_call_count(sx, sy, ex, ey)
+    local count = 0
+    if sx ~= 0 then
+        count = count + 1
+    end
+
+    if sy + 1 < ey then
+        count = count + 1
+    end
+
+    if sy < ey and ex ~= 0 then
+        count = count + 1
+    end
+    return count
 end
 
 function draw()
@@ -113,20 +140,23 @@ function draw()
         return
     end
 
-    GuiZSet(gui, -10100)
 
     local sx, sy = 0, 0
-    local cr, cg, cb = getrgb(0, 0)
+    local ck = color_key(getrgb(0, 0))
     local y = 0
     local x = 1
 
+    local spans = {}
+    local draw_call_count_by_ck = {}
+
     while y < screen_pixels_height do
         while x < screen_pixels_width do
-            local r,g,b = getrgb(x, y)
-            if r ~= cr or g ~= cg or b ~= cb then
-                draw_screen_span(gui, sx, sy, x, y, cr, cg, cb)
+            local k = color_key(getrgb(x, y))
+            if ck ~= k then
+                table.insert(spans, {sx, sy, x, y, ck})
+                draw_call_count_by_ck[ck] = (draw_call_count_by_ck[ck] or 0) + span_draw_call_count(sx, sy, x, y)
 
-                cr, cg, cb = r, g, b
+                ck = k
                 sx, sy = x, y
             end
 
@@ -136,7 +166,28 @@ function draw()
         x = 0
     end
 
-    draw_screen_span(gui, sx, sy, x, y, cr, cg, cb)
+    table.insert(spans, {sx, sy, x, y, ck})
+    draw_call_count_by_ck[ck] = (draw_call_count_by_ck[ck] or 0) + span_draw_call_count(sx, sy, x, y)
+
+    local most_common_count = 0
+    local most_common_key = nil
+    for key, count in pairs(draw_call_count_by_ck) do
+        if count > most_common_count then
+            most_common_count = count
+            most_common_key = key
+        end
+    end
+
+    GuiZSet(gui, -10100)
+    draw_screen_rect(0, 0, screen_pixels_width, screen_pixels_height, key_to_color(most_common_key))
+
+    GuiZSet(gui, -10150)
+    for _, span in ipairs(spans) do
+        local sx, sy, x, y, ck = unpack(span)
+        if ck ~= most_common_key then
+            draw_screen_span(sx, sy, x, y, key_to_color(ck))
+        end
+    end
 end
 
 function handle_inputs(controls)
