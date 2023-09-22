@@ -7,28 +7,30 @@ local function has_cartridge()
     return cartridge_path ~= nil
 end
 
-local core = dofile("mods/GameHamis/core.lua")
+function require(what)
+    if what == "bit" then
+        return bit
+    end
+
+    if what == "gameboy/audio" or what == "gameboy/graphics" or what == "gameboy/z80" then
+        what = what .. "/init"
+    end
+
+    return dofile_once("mods/GameHamis/" .. what .. ".lua")
+end
+
+local GameBoy = dofile_once("mods/GameHamis/gameboy/init.lua")
+local gameboy
 
 function reset()
-    for i=0,core.memory._len-1 do
-        core.memory:write8(i, 0)
-    end
-    core.init()
+    gameboy = GameBoy.new{}
+    gameboy:initialize()
+    gameboy:reset()
 end
 reset()
 
-local frame_location = core.globals[core.exports.FRAME_LOCATION]
-
-local function pixel_addr(x, y)
-    return frame_location + ((y * 160) + x) * 3
-end
-
 local function getrgb(x, y)
-    local location = pixel_addr(x, y)
-    local r = core.memory:read8(location)
-    local g = core.memory:read8(location + 1)
-    local b = core.memory:read8(location + 2)
-    return r, g, b
+    return unpack(gameboy.graphics.game_screen[y][x])
 end
 
 local gui = GuiCreate()
@@ -191,16 +193,18 @@ function draw()
 end
 
 function handle_inputs(controls)
-    core.exports.setJoypadState(
-        (gui_up or ComponentGetValue2(controls, "mButtonDownUp")) and 1 or 0,
-        (gui_right or ComponentGetValue2(controls, "mButtonDownRight")) and 1 or 0,
-        (gui_down or ComponentGetValue2(controls, "mButtonDownDown")) and 1 or 0,
-        (gui_left or ComponentGetValue2(controls, "mButtonDownLeft")) and 1 or 0,
-        (gui_a or ComponentGetValue2(controls, "mButtonDownKick")) and 1 or 0,
-        (gui_b or ComponentGetValue2(controls, "mButtonDownInteract")) and 1 or 0,
-        gui_select and 1 or 0,
-        gui_start and 1 or 0
-    )
+    gameboy.input.keys.Up = (gui_up or ComponentGetValue2(controls, "mButtonDownUp")) and 1 or 0
+    gameboy.input.keys.Right = (gui_right or ComponentGetValue2(controls, "mButtonDownRight")) and 1 or 0
+    gameboy.input.keys.Down = (gui_down or ComponentGetValue2(controls, "mButtonDownDown")) and 1 or 0
+    gameboy.input.keys.Left = (gui_left or ComponentGetValue2(controls, "mButtonDownLeft")) and 1 or 0
+
+    gameboy.input.keys.A = (gui_a or ComponentGetValue2(controls, "mButtonDownKick")) and 1 or 0
+    gameboy.input.keys.B = (gui_b or ComponentGetValue2(controls, "mButtonDownInteract")) and 1 or 0
+
+    gameboy.input.keys.Start = gui_start and 1 or 0
+    gameboy.input.keys.Select = gui_select and 1 or 0
+
+    gameboy.input.update()
 end
 
 function wake_up_waiting_threads()
@@ -253,21 +257,19 @@ function wake_up_waiting_threads()
         if cartridge_path then
             reset()
             local cartridge_datab64 = ModTextFileGetContent(cartridge_path)
+            dofile_once("mods/GameHamis/cartridges.lua")
+            SetRandomSeed(GameGetRealWorldTimeSinceStarted(), 0)
+            cartridge_datab64 = ModTextFileGetContent(cartridges[Random(1, #cartridges)].path)
+
             local cartridge_data = base64.decode(cartridge_datab64)
-
-            local cartridge_rom_addr = core.globals[core.exports.CARTRIDGE_ROM_LOCATION]
-            for i=1,#cartridge_data do
-                core.memory:write8(cartridge_rom_addr + i - 1, cartridge_data:byte(i, i))
-            end
-
-            core.exports.config(0,1,1,1,1,1,1,1,0,0)
+            gameboy.cartridge.load(cartridge_data, #cartridge_data)
+            gameboy:reset()
         end
     end
 
     if not has_cartridge() then return end
 
-    core.exports.executeFrame()
-    core.exports.clearAudioBuffer()
+    gameboy:run_until_vblank()
 
     if controls then
         handle_inputs(controls)

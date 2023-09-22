@@ -24,12 +24,12 @@ cartridges = {
         license = "GPLv3",
         path = "mods/GameHamis/cartridges/ucity.gbcb64.txt",
     },
-    {
+    --[[{ Adjustris unfortunately doesn't work with LuaGB. Disable for now.
         name = "Adjustris",
         website = "https://github.com/tbsp/Adjustris",
         license = "CC0",
         path = "mods/GameHamis/cartridges/adjustris.gbb64.txt",
-    },
+    },]]
     {
         name = "Libbet",
         website = "https://github.com/pinobatch/libbet",

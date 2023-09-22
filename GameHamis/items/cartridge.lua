@@ -1,4 +1,4 @@
-dofile("mods/GameHamis/cartridges.lua")
+dofile_once("mods/GameHamis/cartridges.lua")
 
 function init(entity_id)
     local x,y = EntityGetTransform(entity_id)
