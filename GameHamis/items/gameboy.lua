@@ -267,9 +267,12 @@ function wake_up_waiting_threads()
         if cartridge_path then
             reset()
             local cartridge_datab64 = ModTextFileGetContent(cartridge_path)
+
+            --[[ Testing code
             dofile_once("mods/GameHamis/cartridges.lua")
             SetRandomSeed(GameGetRealWorldTimeSinceStarted(), 0)
             cartridge_datab64 = ModTextFileGetContent(cartridges[Random(1, #cartridges)].path)
+            --]]
 
             local cartridge_data = base64.decode(cartridge_datab64)
             gameboy.cartridge.load(cartridge_data, #cartridge_data)
