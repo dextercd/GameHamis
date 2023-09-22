@@ -193,13 +193,23 @@ function draw()
 end
 
 function handle_inputs(controls)
-    gameboy.input.keys.Up = (gui_up or ComponentGetValue2(controls, "mButtonDownUp")) and 1 or 0
-    gameboy.input.keys.Right = (gui_right or ComponentGetValue2(controls, "mButtonDownRight")) and 1 or 0
-    gameboy.input.keys.Down = (gui_down or ComponentGetValue2(controls, "mButtonDownDown")) and 1 or 0
-    gameboy.input.keys.Left = (gui_left or ComponentGetValue2(controls, "mButtonDownLeft")) and 1 or 0
+    local controls_up, controls_right, controls_down, controls_left, controls_a, controls_b
+    if controls then
+        controls_up = ComponentGetValue2(controls, "mButtonDownUp")
+        controls_right = ComponentGetValue2(controls, "mButtonDownRight")
+        controls_down = ComponentGetValue2(controls, "mButtonDownDown")
+        controls_left = ComponentGetValue2(controls, "mButtonDownLeft")
+        controls_a = ComponentGetValue2(controls, "mButtonDownKick")
+        controls_b = ComponentGetValue2(controls, "mButtonDownInteract")
+    end
 
-    gameboy.input.keys.A = (gui_a or ComponentGetValue2(controls, "mButtonDownKick")) and 1 or 0
-    gameboy.input.keys.B = (gui_b or ComponentGetValue2(controls, "mButtonDownInteract")) and 1 or 0
+    gameboy.input.keys.Up = (gui_up or controls_up) and 1 or 0
+    gameboy.input.keys.Right = (gui_right or controls_right) and 1 or 0
+    gameboy.input.keys.Down = (gui_down or controls_down) and 1 or 0
+    gameboy.input.keys.Left = (gui_left or controls_left) and 1 or 0
+
+    gameboy.input.keys.A = (gui_a or controls_a) and 1 or 0
+    gameboy.input.keys.B = (gui_b or controls_b) and 1 or 0
 
     gameboy.input.keys.Start = gui_start and 1 or 0
     gameboy.input.keys.Select = gui_select and 1 or 0
@@ -267,12 +277,9 @@ function wake_up_waiting_threads()
         end
     end
 
-    if not has_cartridge() then return end
-
-    gameboy:run_until_vblank()
-
-    if controls then
+    if has_cartridge() then
         handle_inputs(controls)
+        gameboy:run_until_vblank()
     end
 end
 
