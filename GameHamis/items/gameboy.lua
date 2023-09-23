@@ -1,11 +1,10 @@
 dofile_once("data/scripts/lib/utilities.lua")
+dofile_once("mods/GameHamis/cartridges.lua")
+local vsc_util = dofile_once("mods/GameHamis/utils/vsc_util.lua")
 
 local base64 = dofile("mods/GameHamis/base64.lua")
 
-local cartridge_path = nil
-local function has_cartridge()
-    return cartridge_path ~= nil
-end
+local cartridge = nil
 
 function require(what)
     if what == "bit" then
@@ -107,6 +106,20 @@ local function span_draw_call_count(sx, sy, ex, ey)
     return count
 end
 
+local cartridge_by_path = {}
+for _, c in ipairs(cartridges) do
+    cartridge_by_path[c.path] = c
+end
+
+function entity_get_cartridge_info(entity_id)
+    local cartridge_path = vsc_util.getstr(entity_id, "cartridge_path")
+    if cartridge_path then
+        return cartridge_by_path[cartridge_path]
+    end
+
+    return nil
+end
+
 function draw()
     GuiZSet(gui, -10000)
 
@@ -138,7 +151,7 @@ function draw()
     gui_select = GuiImageButton(gui, 107, offset_x + 83, offset_y + 275, "", "mods/GameHamis/ui/c.png")
     gui_start = GuiImageButton(gui, 108, offset_x + 113, offset_y + 275, "", "mods/GameHamis/ui/c.png")
 
-    if not has_cartridge() then
+    if cartridge == nil then
         return
     end
 
@@ -227,18 +240,9 @@ function wake_up_waiting_threads()
 
     local player = EntityGetRootEntity(e)
 
-    local new_cartridge_path
 
     local cartridge_entity = (EntityGetAllChildren(e) or {})[1]
-    if cartridge_entity then
-        local vscs = EntityGetComponentIncludingDisabled(cartridge_entity, "VariableStorageComponent") or {}
-        for _, vsc in ipairs(vscs) do
-            if ComponentGetValue2(vsc, "name") == "cartridge_path" then
-                new_cartridge_path = ComponentGetValue2(vsc, "value_string")
-                break
-            end
-        end
-    end
+    local new_cartridge = entity_get_cartridge_info(cartridge_entity)
 
     local gh_gaming
     local controls
@@ -262,14 +266,13 @@ function wake_up_waiting_threads()
         end
     end
 
-    if cartridge_path ~= new_cartridge_path then
-        cartridge_path = new_cartridge_path
-        if cartridge_path then
+    if cartridge ~= new_cartridge then
+        cartridge = new_cartridge
+        if cartridge then
             reset()
-            local cartridge_datab64 = ModTextFileGetContent(cartridge_path)
+            local cartridge_datab64 = ModTextFileGetContent(cartridge.path)
 
             --[[ Testing code
-            dofile_once("mods/GameHamis/cartridges.lua")
             SetRandomSeed(GameGetRealWorldTimeSinceStarted(), 0)
             cartridge_datab64 = ModTextFileGetContent(cartridges[Random(1, #cartridges)].path)
             --]]
@@ -280,7 +283,7 @@ function wake_up_waiting_threads()
         end
     end
 
-    if has_cartridge() then
+    if cartridge ~= nil then
         handle_inputs(controls)
         gameboy:run_until_vblank()
     end
