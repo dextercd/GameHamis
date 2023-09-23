@@ -6,6 +6,54 @@ local base64 = dofile("mods/GameHamis/base64.lua")
 
 local cartridge = nil
 
+local imgui = load_imgui and load_imgui({mod="GameHamis", version="1.0.0"})
+
+function CopyTextButton(gui, id, x, y, label, text)
+    label = label .. ": "
+    if imgui then
+        local lw = GuiGetTextDimensions(gui, label)
+        GuiText(gui, x, y, label)
+        if GuiButton(gui, id, x + lw, y, "[Copy] " .. text) then
+            imgui.SetClipboardText(text)
+        end
+    else
+        GuiText(gui, x, y, label .. text)
+    end
+end
+
+local screen_pixels_width = 160
+local screen_pixels_height = 144
+
+local offset_x = 170
+local offset_y = 50
+
+local screen_offset_x = offset_x + 28
+local screen_offset_y = offset_y +  21
+
+local gui = GuiCreate()
+
+function show_copyright()
+    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+    GuiText(gui, offset_x + 221, offset_y + 20, "Powered by LuaGB")
+
+    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+    GuiText(gui, offset_x + 221, offset_y + 30, "License: BSD-3")
+
+    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+    CopyTextButton(gui, 200, offset_x + 221, offset_y + 40, "Website", "https://github.com/zeta0134/LuaGB")
+
+    if cartridge then
+        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+        GuiText(gui, offset_x + 221, offset_y + 55, "Cartridge: " .. cartridge.name)
+
+        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+        GuiText(gui, offset_x + 221, offset_y + 65, "License: " .. cartridge.license)
+
+        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+        CopyTextButton(gui, 201, offset_x + 221, offset_y + 75, "Website", cartridge.website)
+    end
+end
+
 function require(what)
     if what == "bit" then
         return bit
@@ -32,8 +80,6 @@ local function getrgb(x, y)
     return unpack(gameboy.graphics.game_screen[y][x])
 end
 
-local gui = GuiCreate()
-
 local gui_up = false
 local gui_down = false
 local gui_left = false
@@ -44,15 +90,6 @@ local gui_b = false
 
 local gui_select = false
 local gui_start = false
-
-local screen_pixels_width = 160
-local screen_pixels_height = 144
-
-local offset_x = 200
-local offset_y = 50
-
-local screen_offset_x = offset_x + 28
-local screen_offset_y = offset_y +  21
 
 local function draw_screen_rect(x, y, w, h, r, g, b)
     local id = 100000 + y * screen_pixels_width + x
@@ -256,12 +293,12 @@ function wake_up_waiting_threads()
     draw()
 
     if controls then
-        if GuiButton(gui, 109, offset_x + 220, offset_y, "Unfocus") then
+        if GuiButton(gui, 109, offset_x + 221, offset_y, "[Unfocus]") then
             local ge = EntityGetFirstComponent(gh_gaming, "GameEffectComponent")
             ComponentSetValue2(ge, "frames", 0)
         end
     else
-        if GuiButton(gui, 110, offset_x + 220, offset_y, "Focus") then
+        if GuiButton(gui, 110, offset_x + 221, offset_y, "[Focus]") then
             LoadGameEffectEntityTo(player, "mods/GameHamis/entities/effect_gaming.xml")
         end
     end
@@ -286,6 +323,11 @@ function wake_up_waiting_threads()
     if cartridge ~= nil then
         handle_inputs(controls)
         gameboy:run_until_vblank()
+    end
+
+    local show_copy = GlobalsGetValue("GameHamis.copyright_notices") == "1"
+    if show_copy then
+        show_copyright()
     end
 end
 
