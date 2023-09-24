@@ -289,9 +289,7 @@ function save_ram_to_cartridge_entity()
     for i=0, #gameboy.cartridge.external_ram do
         table.insert(parts, string.char(gameboy.cartridge.external_ram[i]))
     end
-    local ram = table.concat(parts)
-    print("Saved from ram: " .. #ram .. " bytes")
-    set_cartridge_ram(cartridge_entity, ram)
+    set_cartridge_ram(cartridge_entity, table.concat(parts))
 end
 
 function load_ram_from_cartridge_entity()
@@ -299,7 +297,6 @@ function load_ram_from_cartridge_entity()
     if not ram then
         return
     end
-    print("Loaded to ram: " .. #ram .. " bytes")
     for i=1,#ram do
         gameboy.cartridge.external_ram[i - 1] = string.byte(ram, i)
     end
