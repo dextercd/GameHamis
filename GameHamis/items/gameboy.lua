@@ -4,8 +4,6 @@ local vsc_util = dofile_once("mods/GameHamis/utils/vsc_util.lua")
 
 local base64 = dofile("mods/GameHamis/base64.lua")
 
-local cartridge = nil
-
 local imgui = load_imgui and load_imgui({mod="GameHamis", version="1.0.0"})
 
 function CopyTextButton(gui, id, x, y, label, text)
@@ -32,28 +30,6 @@ local screen_offset_y = offset_y +  21
 
 local gui = GuiCreate()
 
-function show_copyright()
-    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
-    GuiText(gui, offset_x + 221, offset_y + 20, "Powered by LuaGB")
-
-    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
-    GuiText(gui, offset_x + 221, offset_y + 30, "License: BSD-3")
-
-    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
-    CopyTextButton(gui, 200, offset_x + 221, offset_y + 40, "Website", "https://github.com/zeta0134/LuaGB")
-
-    if cartridge then
-        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
-        GuiText(gui, offset_x + 221, offset_y + 55, "Cartridge: " .. cartridge.name)
-
-        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
-        GuiText(gui, offset_x + 221, offset_y + 65, "License: " .. cartridge.license)
-
-        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
-        CopyTextButton(gui, 201, offset_x + 221, offset_y + 75, "Website", cartridge.website)
-    end
-end
-
 function require(what)
     if what == "bit" then
         return bit
@@ -67,10 +43,13 @@ function require(what)
 end
 
 local GameBoy = dofile_once("mods/GameHamis/gameboy/init.lua")
-local gameboy
+
+local gameboy = nil
+local cartridge_entity = nil
+local cartridge = nil
 
 function reset()
-    gameboy = GameBoy.new{}
+    gameboy = GameBoy.new({})
     gameboy:initialize()
     gameboy:reset()
 end
@@ -157,6 +136,20 @@ function entity_get_cartridge_info(entity_id)
     return nil
 end
 
+function get_cartridge_ram(entity_id)
+    local b64_data = vsc_util.getstr(entity_id, "ram")
+    if not b64_data then
+        return nil
+    end
+
+    return base64.decode(b64_data)
+end
+
+function set_cartridge_ram(entity_id, data)
+    local b64_data = base64.encode(data)
+    vsc_util.setstr(entity_id, "ram", b64_data)
+end
+
 function draw()
     GuiZSet(gui, -10000)
 
@@ -191,7 +184,6 @@ function draw()
     if cartridge == nil then
         return
     end
-
 
     local sx, sy = 0, 0
     local ck = color_key(getrgb(0, 0))
@@ -242,6 +234,28 @@ function draw()
     end
 end
 
+function show_copyright()
+    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+    GuiText(gui, offset_x + 221, offset_y + 20, "Powered by LuaGB")
+
+    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+    GuiText(gui, offset_x + 221, offset_y + 30, "License: BSD-3")
+
+    GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+    CopyTextButton(gui, 200, offset_x + 221, offset_y + 40, "Website", "https://github.com/zeta0134/LuaGB")
+
+    if cartridge then
+        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+        GuiText(gui, offset_x + 221, offset_y + 55, "Cartridge: " .. cartridge.name)
+
+        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+        GuiText(gui, offset_x + 221, offset_y + 65, "License: " .. cartridge.license)
+
+        GuiColorSetForNextWidget(gui, 1, 1, 1, 0.5)
+        CopyTextButton(gui, 201, offset_x + 221, offset_y + 75, "Website", cartridge.website)
+    end
+end
+
 function handle_inputs(controls)
     local controls_up, controls_right, controls_down, controls_left, controls_a, controls_b
     if controls then
@@ -267,19 +281,78 @@ function handle_inputs(controls)
     gameboy.input.update()
 end
 
+function save_ram_to_cartridge_entity()
+    if not gameboy.cartridge.external_ram.dirty then return end
+    gameboy.cartridge.external_ram.dirty = false
+
+    local parts = {}
+    for i=0, #gameboy.cartridge.external_ram do
+        table.insert(parts, string.char(gameboy.cartridge.external_ram[i]))
+    end
+    local ram = table.concat(parts)
+    print("Saved from ram: " .. #ram .. " bytes")
+    set_cartridge_ram(cartridge_entity, ram)
+end
+
+function load_ram_from_cartridge_entity()
+    local ram = get_cartridge_ram(cartridge_entity)
+    if not ram then
+        return
+    end
+    print("Loaded to ram: " .. #ram .. " bytes")
+    for i=1,#ram do
+        gameboy.cartridge.external_ram[i - 1] = string.byte(ram, i)
+    end
+end
+
+local last_frame_enabled = false
+
 function wake_up_waiting_threads()
     GuiStartFrame(gui)
 
-    local e = GetUpdatedEntityID()
-    local s = EntityGetFirstComponent(e, "SpriteComponent")
+    local gameboy_entity = GetUpdatedEntityID()
+    local enabled = EntityGetFirstComponent(gameboy_entity, "SpriteComponent") ~= nil
 
-    if not s then return end
+    if last_frame_enabled and not enabled then
+        -- Immediately Store RAM when you stop using the device
+        save_ram_to_cartridge_entity()
+    end
 
-    local player = EntityGetRootEntity(e)
+    last_frame_enabled = enabled
+    if not enabled then return end
 
+    -- While using the device, store RAM every 5 seconds
+    if GameGetFrameNum() % (60 * 5) == 0 then
+        save_ram_to_cartridge_entity()
+    end
 
-    local cartridge_entity = (EntityGetAllChildren(e) or {})[1]
-    local new_cartridge = entity_get_cartridge_info(cartridge_entity)
+    local player = EntityGetRootEntity(gameboy_entity)
+
+    local new_cartridge_entity = (EntityGetAllChildren(gameboy_entity) or {})[1]
+
+    if cartridge_entity ~= new_cartridge_entity then
+        if cartridge then
+            save_ram_to_cartridge_entity()
+        end
+
+        cartridge_entity = new_cartridge_entity
+        cartridge = entity_get_cartridge_info(new_cartridge_entity)
+
+        if cartridge then
+            reset()
+            local cartridge_datab64 = ModTextFileGetContent(cartridge.path)
+
+            --[[ Testing code
+            SetRandomSeed(GameGetRealWorldTimeSinceStarted(), 0)
+            cartridge_datab64 = ModTextFileGetContent(cartridges[Random(1, #cartridges)].path)
+            --]]
+
+            local cartridge_data = base64.decode(cartridge_datab64)
+            gameboy.cartridge.load(cartridge_data, #cartridge_data)
+            load_ram_from_cartridge_entity()
+            gameboy:reset()
+        end
+    end
 
     local gh_gaming
     local controls
@@ -289,8 +362,6 @@ function wake_up_waiting_threads()
             controls = EntityGetFirstComponent(v, "ControlsComponent")
         end
     end
-
-    draw()
 
     if controls then
         if GuiButton(gui, 109, offset_x + 221, offset_y, "[Unfocus]") then
@@ -303,27 +374,12 @@ function wake_up_waiting_threads()
         end
     end
 
-    if cartridge ~= new_cartridge then
-        cartridge = new_cartridge
-        if cartridge then
-            reset()
-            local cartridge_datab64 = ModTextFileGetContent(cartridge.path)
-
-            --[[ Testing code
-            SetRandomSeed(GameGetRealWorldTimeSinceStarted(), 0)
-            cartridge_datab64 = ModTextFileGetContent(cartridges[Random(1, #cartridges)].path)
-            --]]
-
-            local cartridge_data = base64.decode(cartridge_datab64)
-            gameboy.cartridge.load(cartridge_data, #cartridge_data)
-            gameboy:reset()
-        end
-    end
-
     if cartridge ~= nil then
         handle_inputs(controls)
         gameboy:run_until_vblank()
     end
+
+    draw()
 
     local show_copy = GlobalsGetValue("GameHamis.copyright_notices") == "1"
     if show_copy then

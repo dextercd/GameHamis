@@ -13,6 +13,14 @@ function vsc_util.get(entity_id, name)
     return nil
 end
 
+function vsc_util.get_or_create(entity_id, name)
+    local vsc = vsc_util.get(entity_id, name)
+    if not vsc then
+        vsc = EntityAddComponent2(entity_id, "VariableStorageComponent", {name=name})
+    end
+    return vsc
+end
+
 function vsc_util.getstr(entity_id, name)
     local vsc = vsc_util.get(entity_id, name)
     if not vsc then
@@ -20,6 +28,11 @@ function vsc_util.getstr(entity_id, name)
     end
 
     return ComponentGetValue2(vsc, "value_string")
+end
+
+function vsc_util.setstr(entity_id, name, str)
+    local vsc = vsc_util.get_or_create(entity_id, name)
+    ComponentSetValue2(vsc, "value_string", str)
 end
 
 return vsc_util
