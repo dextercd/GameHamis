@@ -85,7 +85,6 @@
         _tags="enabled_in_hand"
         execute_every_n_frame="-1"
         script_enabled_changed="mods/GameHamis/scripts/block_inputs.lua"
-        script_death="mods/GameHamis/scripts/block_inputs.lua"
         />
 
 </Entity>

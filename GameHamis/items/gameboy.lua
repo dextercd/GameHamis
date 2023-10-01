@@ -70,27 +70,27 @@ local gui_b = false
 local gui_select = false
 local gui_start = false
 
-local function draw_screen_rect(x, y, w, h, r, g, b)
+local function draw_screen_rect(x, y, w, h, r, g, b, alpha)
     local id = 100000 + y * screen_pixels_width + x
     GuiColorSetForNextWidget(gui, r/255, g/255, b/255, 1)
-    GuiImage(gui, id, screen_offset_x + x, screen_offset_y + y, "mods/GameHamis/1.png", 1, w, h)
+    GuiImage(gui, id, screen_offset_x + x, screen_offset_y + y, "mods/GameHamis/1.png", alpha, w, h)
 end
 
-local function draw_screen_span(sx, sy, ex, ey, r, g, b)
+local function draw_screen_span(sx, sy, ex, ey, r, g, b, alpha)
     if sx ~= 0 and sy < ey then
-        draw_screen_rect(sx, sy, screen_pixels_width - sx, 1, r, g, b)
+        draw_screen_rect(sx, sy, screen_pixels_width - sx, 1, r, g, b, alpha)
         sx = 0
         sy = sy + 1
     end
 
     local fulllines = ey - sy
     if fulllines > 0 then
-        draw_screen_rect(0, sy, screen_pixels_width, fulllines, r, g, b)
+        draw_screen_rect(0, sy, screen_pixels_width, fulllines, r, g, b, alpha)
         sy = sy + fulllines
     end
 
     if ex > sx then
-        draw_screen_rect(sx, ey, ex - sx, 1, r, g, b)
+        draw_screen_rect(sx, ey, ex - sx, 1, r, g, b, alpha)
     end
 end
 
@@ -150,26 +150,19 @@ function set_cartridge_ram(entity_id, data)
     vsc_util.setstr(entity_id, "ram", b64_data)
 end
 
-function draw()
+function draw(held_by_player, alpha)
     GuiZSet(gui, -10000)
 
     GuiOptionsAdd(gui, GUI_OPTION.NoPositionTween)
 
-    -- Horscht magic. Disable buttons taking focus when using controller
-    local player = EntityGetWithTag("player_unit")[1]
-    if player then
-        local platform_shooter_player = EntityGetFirstComponentIncludingDisabled(player, "PlatformShooterPlayerComponent")
-        if platform_shooter_player then
-            if ComponentGetValue2(platform_shooter_player, "mHasGamepadControlsPrev") then
-                GuiOptionsAdd(gui, GUI_OPTION.NonInteractive)
-                GuiOptionsAdd(gui, GUI_OPTION.AlwaysClickable)
-            end
-        end
+    if not held_by_player or GameGetIsGamepadConnected() then
+        GuiOptionsAdd(gui, GUI_OPTION.NonInteractive)
     end
 
-    GuiImage(gui, 100, offset_x, offset_y, "mods/GameHamis/ui/device.png", 1, 1, 1)
+    GuiImage(gui, 100, offset_x, offset_y, "mods/GameHamis/ui/device.png", alpha, 1, 1)
 
     GuiZSet(gui, -10050)
+
     gui_up = GuiImageButton(gui, 101, offset_x + 28, offset_y + 212, "", "mods/GameHamis/ui/up.png")
     gui_down = GuiImageButton(gui, 102, offset_x + 28, offset_y + 234, "", "mods/GameHamis/ui/down.png")
     gui_left = GuiImageButton(gui, 103, offset_x + 12, offset_y + 228, "", "mods/GameHamis/ui/left.png")
@@ -223,13 +216,17 @@ function draw()
     end
 
     GuiZSet(gui, -10100)
-    draw_screen_rect(0, 0, screen_pixels_width, screen_pixels_height, key_to_color(most_common_key))
+    do
+        local r, g, b = key_to_color(most_common_key)
+        draw_screen_rect(0, 0, screen_pixels_width, screen_pixels_height, r, g, b, alpha)
+    end
 
     GuiZSet(gui, -10150)
     for _, span in ipairs(spans) do
         local sx, sy, x, y, ck = unpack(span)
         if ck ~= most_common_key then
-            draw_screen_span(sx, sy, x, y, key_to_color(ck))
+            local r, g, b = key_to_color(ck)
+            draw_screen_span(sx, sy, x, y, r, g, b, alpha)
         end
     end
 end
@@ -256,27 +253,47 @@ function show_copyright()
     end
 end
 
-function handle_inputs(controls)
-    local controls_up, controls_right, controls_down, controls_left, controls_a, controls_b
+function handle_inputs(controls, holder_id, held_by_player)
+    local up, right, down, left, a, b, start, select
     if controls then
-        controls_up = ComponentGetValue2(controls, "mButtonDownUp")
-        controls_right = ComponentGetValue2(controls, "mButtonDownRight")
-        controls_down = ComponentGetValue2(controls, "mButtonDownDown")
-        controls_left = ComponentGetValue2(controls, "mButtonDownLeft")
-        controls_a = ComponentGetValue2(controls, "mButtonDownKick")
-        controls_b = ComponentGetValue2(controls, "mButtonDownInteract")
+        up = ComponentGetValue2(controls, "mButtonDownUp")
+        right = ComponentGetValue2(controls, "mButtonDownRight")
+        down = ComponentGetValue2(controls, "mButtonDownDown")
+        left = ComponentGetValue2(controls, "mButtonDownLeft")
+        a = ComponentGetValue2(controls, "mButtonDownKick")
+        b = ComponentGetValue2(controls, "mButtonDownInteract")
     end
 
-    gameboy.input.keys.Up = (gui_up or controls_up) and 1 or 0
-    gameboy.input.keys.Right = (gui_right or controls_right) and 1 or 0
-    gameboy.input.keys.Down = (gui_down or controls_down) and 1 or 0
-    gameboy.input.keys.Left = (gui_left or controls_left) and 1 or 0
+    if held_by_player then
+        up = (up or gui_up)
+        right = (right or gui_right)
+        down = (down or gui_down)
+        left = (left or gui_left)
+        a = (a or gui_a)
+        b = (b or gui_b)
 
-    gameboy.input.keys.A = (gui_a or controls_a) and 1 or 0
-    gameboy.input.keys.B = (gui_b or controls_b) and 1 or 0
+        start = gui_start
+        select = gui_select
+    end
 
-    gameboy.input.keys.Start = gui_start and 1 or 0
-    gameboy.input.keys.Select = gui_select and 1 or 0
+    if controls and not held_by_player then
+        SetRandomSeed(math.min(GameGetFrameNum() / 20), holder_id)
+        start = Random() < 0.003
+        select = Random() < 0.003
+        a = a or (ComponentGetValue2(controls, "mButtonFrameFly") == GameGetFrameNum())
+        b = b or ComponentGetValue2(controls, "mButtonDownRun")
+    end
+
+    gameboy.input.keys.Up = up and 1 or 0
+    gameboy.input.keys.Right = right and 1 or 0
+    gameboy.input.keys.Down = down and 1 or 0
+    gameboy.input.keys.Left = left and 1 or 0
+
+    gameboy.input.keys.A = a and 1 or 0
+    gameboy.input.keys.B = b and 1 or 0
+
+    gameboy.input.keys.Start = start and 1 or 0
+    gameboy.input.keys.Select = select and 1 or 0
 
     gameboy.input.update()
 end
@@ -323,7 +340,8 @@ function wake_up_waiting_threads()
         save_ram_to_cartridge_entity()
     end
 
-    local player = EntityGetRootEntity(gameboy_entity)
+    local holder_id = EntityGetRootEntity(gameboy_entity)
+    local held_by_player = EntityHasTag(holder_id, "player_unit") or EntityHasTag(holder_id, "polymorphed_player")
 
     local new_cartridge_entity = (EntityGetAllChildren(gameboy_entity) or {})[1]
 
@@ -353,30 +371,60 @@ function wake_up_waiting_threads()
 
     local gh_gaming
     local controls
-    for _, v in ipairs(EntityGetAllChildren(player) or {}) do
-        if EntityGetName(v) == "gh_gaming" then
-            gh_gaming = v
-            controls = EntityGetFirstComponent(v, "ControlsComponent")
-        end
-    end
-
-    if controls then
-        if GuiButton(gui, 109, offset_x + 221, offset_y, "[Unfocus]") then
-            local ge = EntityGetFirstComponent(gh_gaming, "GameEffectComponent")
-            ComponentSetValue2(ge, "frames", 0)
+    if held_by_player then
+        for _, v in ipairs(EntityGetAllChildren(holder_id) or {}) do
+            if EntityGetName(v) == "gh_gaming" then
+                gh_gaming = v
+                controls = EntityGetFirstComponent(v, "ControlsComponent")
+            end
         end
     else
-        if GuiButton(gui, 110, offset_x + 221, offset_y, "[Focus]") then
-            LoadGameEffectEntityTo(player, "mods/GameHamis/entities/effect_gaming.xml")
+        controls = EntityGetFirstComponent(holder_id, "ControlsComponent")
+    end
+
+    if held_by_player then
+        if controls then
+            if GuiButton(gui, 109, offset_x + 221, offset_y, "[Unfocus]") then
+                local ge = EntityGetFirstComponent(gh_gaming, "GameEffectComponent")
+                ComponentSetValue2(ge, "frames", 0)
+            end
+        else
+            if GuiButton(gui, 110, offset_x + 221, offset_y, "[Focus]") then
+                LoadGameEffectEntityTo(holder_id, "mods/GameHamis/entities/effect_gaming.xml")
+            end
         end
     end
 
     if cartridge ~= nil then
-        handle_inputs(controls)
+        handle_inputs(controls, holder_id, held_by_player)
         gameboy:run_until_vblank()
     end
 
-    draw()
+    local alpha = 1
+    local skip_draw = false
+
+    if not held_by_player then
+        local ix, iy = EntityGetTransform(gameboy_entity)
+        local player = EntityGetClosestWithTag(ix, iy, "player_unit") or EntityGetClosestWithTag(ix, iy, "polymorphed_player")
+        if player then
+            local px, py = EntityGetTransform(player)
+            local dx, dy = ix - px, iy - py
+            local d = math.sqrt(dx * dx + dy * dy)
+
+            local maxd = 200
+            local maxa = 0.5
+            local mina = 0.3
+            local sharpness = 2
+            alpha = maxa - (maxa - mina) * (math.pow(d, sharpness) / math.pow(maxd, sharpness))
+            skip_draw = d > maxd
+        else
+            alpha = 0.2
+        end
+    end
+
+    if not skip_draw then
+        draw(held_by_player, alpha)
+    end
 
     local show_copy = GlobalsGetValue("GameHamis.copyright_notices") == "1"
     if show_copy then

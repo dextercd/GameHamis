@@ -1,5 +1,3 @@
-local gaming_effect
-
 function remove_effect(e)
     for _, child in ipairs(EntityGetAllChildren(e) or {}) do
         if EntityGetName(child) == "gh_gaming" then
@@ -12,12 +10,18 @@ function remove_effect(e)
 end
 
 function enabled_changed(e, enabled)
-    local player = EntityGetRootEntity(e)
+    local root = EntityGetRootEntity(e)
+    local is_player = EntityHasTag(root, "player_unit") or EntityHasTag(root, "polymorphed_player")
+
+    if not is_player then
+        return
+    end
+
     if enabled then
-        if player ~= e then
-            LoadGameEffectEntityTo(player, "mods/GameHamis/entities/effect_gaming.xml")
+        if root ~= e then
+            LoadGameEffectEntityTo(root, "mods/GameHamis/entities/effect_gaming.xml")
         end
     else
-        remove_effect(player)
+        remove_effect(root)
     end
 end
