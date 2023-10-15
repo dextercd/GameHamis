@@ -1,4 +1,4 @@
-<Entity name="cartridge">
+<Entity name="gh_cartridge">
 
     <ItemComponent
         _tags="enabled_in_world"

@@ -1,4 +1,4 @@
-<Entity>
+<Entity name="gh_console">
 
     <PhysicsBodyComponent
         _tags="enabled_in_world"
