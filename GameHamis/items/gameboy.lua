@@ -405,8 +405,11 @@ function wake_up_waiting_threads()
 
     if not held_by_player then
         local ix, iy = EntityGetTransform(gameboy_entity)
-        local player = EntityGetClosestWithTag(ix, iy, "player_unit") or EntityGetClosestWithTag(ix, iy, "polymorphed_player")
-        if player then
+        local player = EntityGetClosestWithTag(ix, iy, "player_unit")
+        if player == 0 then
+            player = EntityGetClosestWithTag(ix, iy, "polymorphed_player")
+        end
+        if player ~= 0 then
             local px, py = EntityGetTransform(player)
             local dx, dy = ix - px, iy - py
             local d = math.sqrt(dx * dx + dy * dy)
